@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>오늘의 묵상 한 줄</title>
+</head>
+<body style="margin:0; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;">
+
+<div id="daily-wrap"
+     style="
+       min-height:100vh;
+       display:flex;
+       flex-direction:column;
+       align-items:center;
+       justify-content:center;
+       text-align:center;
+       padding:40px 20px;
+       color:#111;
+     ">
+
+  <div id="daily-date" style="font-size:14px; opacity:0.75; margin-bottom:12px;"></div>
+
+  <div style="font-size:22px; font-weight:700; margin-bottom:18px;">
+    오늘의 묵상 한 줄
+  </div>
+
+  <div id="quote-wrap"
+       style="position:relative; width:100%; max-width:720px; padding:18px 10px;">
+
+    <img
+      src="https://cdn.imweb.me/upload/S2026011068ada7ebb3b38/63ab3a738bd09.png"
+      alt=""
+      style="position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
+             width:220px; height:auto; opacity:0.22; z-index:1; pointer-events:none;" />
+
+    <div id="daily-quote"
+         style="position:relative; z-index:2; font-size:20px; line-height:1.8; word-break:keep-all;">
+      불러오는 중...
+    </div>
+  </div>
+</div>
+
+<script>
+(async function () {
+  const CSV_URL_BASE = "https://raw.githubusercontent.com/brownpapa2020-bot/brownpapa/main/Quote365.csv";
+  const START_DATE = "2026-01-01";
+
+  const dateEl = document.getElementById("daily-date");
+  const quoteEl = document.getElementById("daily-quote");
+
+  function nowKST() {
+    return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+  }
+  function formatKoreanDateLong(d) {
+    return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+  }
+
+  const now = nowKST();
+  dateEl.textContent = formatKoreanDateLong(now);
+
+  function daysSinceStart(startDateStr) {
+    const start = new Date(startDateStr + "T00:00:00+09:00");
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    return Math.floor((today - startDay) / 86400000);
+  }
+
+  function parseCSV(text) {
+    const rows = [];
+    let row = [], cur = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i], n = text[i + 1];
+      if (c === '"') {
+        if (inQuotes && n === '"') { cur += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (c === "," && !inQuotes) {
+        row.push(cur); cur = "";
+      } else if ((c === "\n" || c === "\r") && !inQuotes) {
+        if (c === "\r" && n === "\n") i++;
+        row.push(cur); rows.push(row);
+        row = []; cur = "";
+      } else cur += c;
+    }
+    if (cur.length || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  try {
+    const res = await fetch(CSV_URL_BASE + "?cb=" + Date.now());
+    const text = await res.text();
+    const rows = parseCSV(text).filter(r => r.some(v => String(v).trim() !== ""));
+    const header = rows[0].map(h => String(h).trim().toLowerCase());
+
+    let qi = header.indexOf("quote");
+    if (qi === -1) qi = header.indexOf("문장");
+    if (qi === -1) qi = header.indexOf("text");
+
+    const quotes = rows.slice(1).map(r => r[qi]).filter(Boolean);
+    const pos = ((daysSinceStart(START_DATE) % quotes.length) + quotes.length) % quotes.length;
+    quoteEl.textContent = quotes[pos];
+
+  } catch (e) {
+    quoteEl.textContent = "문구를 불러오지 못했습니다.";
+    console.error(e);
+  }
+})();
+</script>
+
+</body>
+</html>
